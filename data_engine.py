@@ -2,9 +2,59 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import warnings
+import time
 warnings.filterwarnings('ignore')
 
+# Fix for rate limiting on cloud servers
+import requests
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+})
+
 def get_stock_data(ticker, interval='1h', period='60d'):
+    try:
+        # Retry up to 3 times with delay
+        for attempt in range(3):
+            try:
+                stock = yf.Ticker(ticker)
+
+                if interval in ['1m', '2m', '5m', '15m', '30m']:
+                    period = '7d'
+                elif interval in ['1h']:
+                    period = '60d'
+                else:
+                    period = '1y'
+
+                df = stock.history(period=period, interval=interval)
+
+                if df.empty and attempt < 2:
+                    time.sleep(2)
+                    continue
+
+                if df.empty:
+                    return None, None
+
+                df.index = pd.to_datetime(df.index)
+                df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+                df.columns = ['open', 'high', 'low', 'close', 'volume']
+                df = df.dropna()
+
+                info = stock.info
+                return df, info
+
+            except Exception as e:
+                if 'Rate' in str(e) or 'Too Many' in str(e):
+                    print(f"Rate limited — waiting 3 seconds (attempt {attempt+1})")
+                    time.sleep(3)
+                    continue
+                raise e
+
+        return None, None
+
+    except Exception as e:
+        print(f"Error fetching stock data: {e}")
+        return None, None
     try:
         stock = yf.Ticker(ticker)
         

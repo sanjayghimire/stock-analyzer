@@ -160,10 +160,15 @@ if analyze_btn and ticker:
                    delta=swing['verdict'])
     with c5:
         target = data['analyst'].get('target_mean', None)
-        target_display = f"${round(target, 2)}" if target else "N/A"
+        try:
+            target_display = f"${round(float(target), 2)}" if target else "N/A"
+        except:
+            target_display = "N/A"
+        rec = (data['analyst'].get('recommendation') or '').upper()
         st.metric("Analyst Target",
-                    target_display,
-                   delta=data['analyst'].get('recommendation','').upper())
+           target_display,
+           delta=rec if rec else None)
+                   delta=data['analyst'].get('recommendation') or '').upper()
 
     st.divider()
 
@@ -348,7 +353,7 @@ if analyze_btn and ticker:
                 st.info(f"💡 {alt_strat.get('reason')}")
         else:
             st.info("No options data available for this ticker")
-            
+
     # ── Tab 3: Market ─────────────────────────────────────────
     with tabs[2]:
         col1, col2, col3 = st.columns(3)

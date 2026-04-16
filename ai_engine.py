@@ -1,18 +1,16 @@
+import anthropic
 import os
 import streamlit as st
 from dotenv import load_dotenv
 load_dotenv()
 
-api_key = (st.secrets.get("ANTHROPIC_API_KEY") 
-           if hasattr(st, 'secrets') 
-           else os.getenv("ANTHROPIC_API_KEY"))
-client = anthropic.Anthropic(api_key=api_key)
+# Works both locally and on Streamlit Cloud
+try:
+    api_key = st.secrets["ANTHROPIC_API_KEY"]
+except:
+    api_key = os.getenv("ANTHROPIC_API_KEY")
 
-def build_prompt(ticker, interval, signals, signal, confidence,
-                 targets, sizing, drawdown, ev, swing,
-                 market, sector, timing, macro,
-                 options_data, best_option, alt_strategy,
-                 analyst, premarket, earnings):
+client = anthropic.Anthropic(api_key=api_key)
 
     earnings_warning = ""
     if earnings.get('warning'):

@@ -168,7 +168,6 @@ if analyze_btn and ticker:
         st.metric("Analyst Target",
            target_display,
            delta=rec if rec else None)
-                   delta=data['analyst'].get('recommendation') or '').upper()
 
     st.divider()
 

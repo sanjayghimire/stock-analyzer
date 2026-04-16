@@ -7,6 +7,90 @@ import time
 import random
 warnings.filterwarnings('ignore')
 
+# ── Ticker Lookup ─────────────────────────────────────────────
+
+COMPANY_NAMES = {
+    # Tech
+    'apple':       'AAPL', 'microsoft':   'MSFT', 'google':      'GOOGL',
+    'alphabet':    'GOOGL', 'amazon':      'AMZN', 'meta':        'META',
+    'facebook':    'META',  'netflix':     'NFLX', 'nvidia':      'NVDA',
+    'tesla':       'TSLA',  'intel':       'INTC', 'amd':         'AMD',
+    'salesforce':  'CRM',   'adobe':       'ADBE', 'zoom':        'ZM',
+    'twitter':     'X',     'uber':        'UBER', 'lyft':        'LYFT',
+    'airbnb':      'ABNB',  'snowflake':   'SNOW', 'palantir':    'PLTR',
+    'coinbase':    'COIN',  'robinhood':   'HOOD', 'shopify':     'SHOP',
+    'spotify':     'SPOT',  'pinterest':   'PINS', 'snap':        'SNAP',
+    'oracle':      'ORCL',  'ibm':         'IBM',  'cisco':       'CSCO',
+    'qualcomm':    'QCOM',  'broadcom':    'AVGO', 'micron':      'MU',
+    'paypal':      'PYPL',  'square':      'SQ',   'block':       'SQ',
+    'servicenow':  'NOW',   'workday':     'WDAY', 'datadog':     'DDOG',
+    'crowdstrike': 'CRWD',  'okta':        'OKTA', 'twilio':      'TWLO',
+
+    # Finance
+    'jpmorgan':       'JPM',  'jp morgan':     'JPM',
+    'goldman sachs':  'GS',   'goldman':        'GS',
+    'morgan stanley': 'MS',   'bank of america':'BAC',
+    'wells fargo':    'WFC',  'citigroup':      'C',
+    'blackrock':      'BLK',  'visa':           'V',
+    'mastercard':     'MA',   'american express':'AXP',
+    'amex':           'AXP',
+
+    # Healthcare
+    'johnson and johnson': 'JNJ', 'johnson & johnson': 'JNJ',
+    'pfizer':    'PFE',  'moderna':   'MRNA', 'merck':     'MRK',
+    'abbvie':    'ABBV', 'unitedhealth': 'UNH', 'cvs':    'CVS',
+    'eli lilly': 'LLY',  'lilly':     'LLY',  'novo nordisk': 'NVO',
+
+    # Consumer
+    'walmart':    'WMT',  'target':      'TGT',  'costco':    'COST',
+    'mcdonalds':  'MCD',  'starbucks':   'SBUX', 'nike':      'NKE',
+    'coca cola':  'KO',   'pepsi':       'PEP',  'pepsico':   'PEP',
+    'disney':     'DIS',  'comcast':     'CMCSA','netflix':   'NFLX',
+    'home depot': 'HD',   'lowes':       'LOW',
+
+    # Energy
+    'exxon':      'XOM',  'chevron':     'CVX',  'shell':     'SHEL',
+    'bp':         'BP',   'conocophillips': 'COP',
+
+    # ETFs
+    'spy':        'SPY',  's&p 500':     'SPY',  'sp500':     'SPY',
+    'qqq':        'QQQ',  'nasdaq':      'QQQ',  'dow jones': 'DIA',
+    'dia':        'DIA',  'iwm':         'IWM',  'russell':   'IWM',
+    'vix':        '^VIX',
+
+    # Other
+    'berkshire':  'BRK-B', 'warren buffett': 'BRK-B',
+    'spacex':     'TSLA',  'elon musk':      'TSLA',
+    'boeing':     'BA',    'lockheed':       'LMT',
+    'caterpillar':'CAT',   'deere':          'DE',
+}
+
+def resolve_ticker(input_text):
+    """
+    Converts company name or symbol to proper ticker
+    Examples:
+      'apple'     -> 'AAPL'
+      'AAPL'      -> 'AAPL'
+      'Apple Inc' -> 'AAPL'
+      'microsoft' -> 'MSFT'
+    """
+    if not input_text:
+        return None
+
+    cleaned = input_text.strip().lower()
+
+    # Direct match in our dictionary
+    if cleaned in COMPANY_NAMES:
+        return COMPANY_NAMES[cleaned]
+
+    # Partial match — check if input contains a known name
+    for name, ticker in COMPANY_NAMES.items():
+        if name in cleaned or cleaned in name:
+            return ticker
+
+    # If nothing found assume it's already a valid ticker symbol
+    return input_text.strip().upper()
+
 def get_stock_data(ticker, interval='1h', period='60d'):
     try:
         if interval in ['1m', '2m', '5m', '15m', '30m']:

@@ -4,6 +4,7 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+from data_engine import resolve_ticker
 from data_engine      import get_all_data
 from indicator_engine import calculate_indicators, get_signals, calculate_score
 from market_engine    import (get_market_conditions, get_sector_data,
@@ -68,8 +69,16 @@ st.divider()
 # ── Input Row ─────────────────────────────────────────────────
 col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 with col1:
-    ticker = st.text_input("Stock Ticker", value="AAPL",
-                            placeholder="AAPL, TSLA, NVDA...").upper().strip()
+    raw_input = st.text_input(
+        "Stock Ticker or Company Name",
+        value="AAPL",
+        placeholder="AAPL, Apple, Tesla, Microsoft, Nvidia..."
+)
+    ticker = resolve_ticker(raw_input)
+
+    if raw_input and ticker != raw_input.upper().strip():
+        st.caption(f"Searching: {ticker}")
+                            
 with col2:
     interval = st.selectbox("Timeframe",
                              ["1m","5m","15m","1h","4h","1d"],

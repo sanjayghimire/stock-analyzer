@@ -1,63 +1,14 @@
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 import warnings
 import time
+import random
 warnings.filterwarnings('ignore')
-
-# Fix for rate limiting on cloud servers
-import requests
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-})
 
 def get_stock_data(ticker, interval='1h', period='60d'):
     try:
-        # Retry up to 3 times with delay
-        for attempt in range(3):
-            try:
-                stock = yf.Ticker(ticker)
-
-                if interval in ['1m', '2m', '5m', '15m', '30m']:
-                    period = '7d'
-                elif interval in ['1h']:
-                    period = '60d'
-                else:
-                    period = '1y'
-
-                df = stock.history(period=period, interval=interval)
-
-                if df.empty and attempt < 2:
-                    time.sleep(2)
-                    continue
-
-                if df.empty:
-                    return None, None
-
-                df.index = pd.to_datetime(df.index)
-                df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-                df.columns = ['open', 'high', 'low', 'close', 'volume']
-                df = df.dropna()
-
-                info = stock.info
-                return df, info
-
-            except Exception as e:
-                if 'Rate' in str(e) or 'Too Many' in str(e):
-                    print(f"Rate limited — waiting 3 seconds (attempt {attempt+1})")
-                    time.sleep(3)
-                    continue
-                raise e
-
-        return None, None
-
-    except Exception as e:
-        print(f"Error fetching stock data: {e}")
-        return None, None
-    try:
-        stock = yf.Ticker(ticker)
-        
         if interval in ['1m', '2m', '5m', '15m', '30m']:
             period = '7d'
         elif interval in ['1h']:
@@ -65,69 +16,102 @@ def get_stock_data(ticker, interval='1h', period='60d'):
         else:
             period = '1y'
 
-        df = stock.history(period=period, interval=interval)
-        
+        # Random delay to avoid rate limiting
+        time.sleep(random.uniform(1, 3))
+
+        stock = yf.Ticker(ticker)
+        df    = stock.history(period=period, interval=interval)
+
+        if df.empty:
+            # Fallback to daily if intraday fails
+            time.sleep(2)
+            df = stock.history(period='1y', interval='1d')
+
         if df.empty:
             return None, None
-            
-        df.index = pd.to_datetime(df.index)
-        df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+
+        df.index   = pd.to_datetime(df.index)
+        df         = df[['Open', 'High', 'Low', 'Close', 'Volume']]
         df.columns = ['open', 'high', 'low', 'close', 'volume']
-        df = df.dropna()
-        
-        info = stock.info
-        
+        df         = df.dropna()
+
+        # Get info with retry
+        info = {}
+        for attempt in range(3):
+            try:
+                info = stock.info
+                if info:
+                    break
+            except:
+                time.sleep(2)
+
         return df, info
+
     except Exception as e:
         print(f"Error fetching stock data: {e}")
         return None, None
 
 def get_premarket_data(ticker):
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        pre_market_price = info.get('preMarketPrice', None)
-        regular_price = info.get('regularMarketPrice', None)
-        previous_close = info.get('previousClose', None)
-        
-        if pre_market_price and regular_price:
-            gap = pre_market_price - previous_close
+        time.sleep(random.uniform(0.5, 1.5))
+        stock    = yf.Ticker(ticker)
+        info     = stock.fast_info
+
+        try:
+            pre_market_price = getattr(info, 'pre_market_price', None)
+            regular_price    = getattr(info, 'last_price', None)
+            previous_close   = getattr(info, 'previous_close', None)
+        except:
+            pre_market_price = None
+            regular_price    = None
+            previous_close   = None
+
+        if pre_market_price and previous_close:
+            gap     = pre_market_price - previous_close
             gap_pct = (gap / previous_close) * 100
-            gap_direction = 'GAP UP' if gap > 0 else 'GAP DOWN'
+            gap_dir = 'GAP UP' if gap > 0 else 'GAP DOWN'
         else:
-            gap = 0
+            gap     = 0
             gap_pct = 0
-            gap_direction = 'No gap data'
-            
+            gap_dir = 'No gap data'
+
         return {
             'pre_market_price': pre_market_price,
-            'regular_price': regular_price,
-            'previous_close': previous_close,
-            'gap': round(gap, 2),
-            'gap_pct': round(gap_pct, 2),
-            'gap_direction': gap_direction
+            'regular_price':    regular_price,
+            'previous_close':   previous_close,
+            'gap':              round(gap, 2),
+            'gap_pct':          round(gap_pct, 2),
+            'gap_direction':    gap_dir
         }
     except Exception as e:
         print(f"Error fetching premarket data: {e}")
-        return {}
+        return {
+            'pre_market_price': None, 'regular_price': None,
+            'previous_close': None, 'gap': 0,
+            'gap_pct': 0, 'gap_direction': 'No gap data'
+        }
 
 def get_options_data(ticker):
     try:
-        stock = yf.Ticker(ticker)
+        time.sleep(random.uniform(0.5, 1.5))
+        stock       = yf.Ticker(ticker)
         expirations = stock.options
-        
+
         if not expirations:
             return None, None
-            
+
         options_data = {}
         for exp in expirations[:6]:
-            opt_chain = stock.option_chain(exp)
-            options_data[exp] = {
-                'calls': opt_chain.calls,
-                'puts': opt_chain.puts
-            }
-            
+            try:
+                opt_chain          = stock.option_chain(exp)
+                options_data[exp]  = {
+                    'calls': opt_chain.calls,
+                    'puts':  opt_chain.puts
+                }
+                time.sleep(0.5)
+            except:
+                continue
+
         return options_data, expirations
     except Exception as e:
         print(f"Error fetching options data: {e}")
@@ -135,68 +119,79 @@ def get_options_data(ticker):
 
 def get_analyst_data(ticker):
     try:
+        time.sleep(random.uniform(0.5, 1))
         stock = yf.Ticker(ticker)
-        info = stock.info
-        
+        info  = stock.info
+
         return {
-            'target_mean': info.get('targetMeanPrice', None),
-            'target_high': info.get('targetHighPrice', None),
-            'target_low': info.get('targetLowPrice', None),
-            'recommendation': info.get('recommendationKey', None),
-            'num_analysts': info.get('numberOfAnalystOpinions', None)
+            'target_mean':    info.get('targetMeanPrice',          None),
+            'target_high':    info.get('targetHighPrice',          None),
+            'target_low':     info.get('targetLowPrice',           None),
+            'recommendation': info.get('recommendationKey',        None),
+            'num_analysts':   info.get('numberOfAnalystOpinions',  None)
         }
     except Exception as e:
         print(f"Error fetching analyst data: {e}")
-        return {}
+        return {
+            'target_mean': None, 'target_high': None,
+            'target_low': None, 'recommendation': None,
+            'num_analysts': None
+        }
 
 def get_earnings_date(ticker):
     try:
-        stock = yf.Ticker(ticker)
+        stock    = yf.Ticker(ticker)
         calendar = stock.calendar
-        
+
         if calendar is not None and not calendar.empty:
             earnings_date = calendar.iloc[0].get('Earnings Date', None)
             if earnings_date:
-                days_until = (pd.Timestamp(earnings_date) - pd.Timestamp.now()).days
+                days_until = (pd.Timestamp(earnings_date) -
+                              pd.Timestamp.now()).days
                 return {
                     'earnings_date': str(earnings_date),
-                    'days_until': days_until,
-                    'warning': days_until <= 14
+                    'days_until':    days_until,
+                    'warning':       days_until <= 14
                 }
         return {'earnings_date': 'Unknown', 'days_until': 999, 'warning': False}
-    except Exception as e:
+    except:
         return {'earnings_date': 'Unknown', 'days_until': 999, 'warning': False}
 
 def get_all_data(ticker, interval='1h'):
     print(f"Fetching data for {ticker}...")
-    
+
     df, info = get_stock_data(ticker, interval)
-    premarket = get_premarket_data(ticker)
+
+    if df is None:
+        print(f"Primary fetch failed — retrying {ticker}...")
+        time.sleep(3)
+        df, info = get_stock_data(ticker, '1d')
+
+    premarket  = get_premarket_data(ticker)
+    time.sleep(1)
     options, expirations = get_options_data(ticker)
-    analyst = get_analyst_data(ticker)
-    earnings = get_earnings_date(ticker)
-    
+    time.sleep(1)
+    analyst    = get_analyst_data(ticker)
+    earnings   = get_earnings_date(ticker)
+
     return {
-        'df': df,
-        'info': info,
-        'premarket': premarket,
-        'options': options,
+        'df':          df,
+        'info':        info,
+        'premarket':   premarket,
+        'options':     options,
         'expirations': expirations,
-        'analyst': analyst,
-        'earnings': earnings,
-        'ticker': ticker,
-        'interval': interval
+        'analyst':     analyst,
+        'earnings':    earnings,
+        'ticker':      ticker,
+        'interval':    interval
     }
 
 if __name__ == "__main__":
-    data = get_all_data("AAPL", "1h")
-    
+    data = get_all_data("AAPL", "1d")
+
     if data['df'] is not None:
-        print(f"\n✅ Stock data fetched successfully!")
-        print(f"Rows of data: {len(data['df'])}")
+        print(f"✅ Stock data fetched!")
+        print(f"Rows: {len(data['df'])}")
         print(f"Latest price: ${data['df']['close'].iloc[-1]:.2f}")
-        print(f"Pre-market: {data['premarket']}")
-        print(f"Analyst target: ${data['analyst'].get('target_mean', 'N/A')}")
-        print(f"Earnings: {data['earnings']}")
     else:
         print("❌ Failed to fetch data")
